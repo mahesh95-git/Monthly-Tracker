@@ -352,14 +352,15 @@
                 const dateDisplay = dateObj.toLocaleString('en-US', { month: 'short', day: '2-digit' }); 
                 
                 const duration = calculateWorkDuration(record.inTime, record.outTime);
-                const inTime12 = formatTime12Hour(record.inTime);
-                const outTime12 = formatTime12Hour(record.outTime);
-
+                // Use 24-hour time values directly
+                const inTime24 = record.inTime || '--:--';
+                const outTime24 = record.outTime || '--:--';
+    
                 html += `
                     <tr class="hover:bg-teal-50 transition duration-150 cursor-pointer">
                         <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">${dateDisplay}</td>
-                        <td class="px-4 py-3 whitespace-nowrap text-sm text-blue-700 font-semibold">${inTime12}</td>
-                        <td class="px-4 py-3 whitespace-nowrap text-sm text-red-700 font-semibold">${outTime12}</td>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-blue-700 font-semibold">${inTime24}</td>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-red-700 font-semibold">${outTime24}</td>
                         <td class="px-4 py-3 whitespace-nowrap text-sm text-teal-600 font-bold">${duration.floatHours} hrs</td>
                     </tr>
                 `;
@@ -405,10 +406,11 @@
             // 3. Update Summary Display - Daily (using 12-hour format)
             const dailyDuration = calculateWorkDuration(todayRecord.inTime, todayRecord.outTime);
             
-            const inTime12 = formatTime12Hour(todayRecord.inTime);
-            const outTime12 = formatTime12Hour(todayRecord.outTime);
+            // Show times in 24-hour format (raw HH:MM)
+            const inTime24 = todayRecord.inTime || '--:--';
+            const outTime24 = todayRecord.outTime || '--:--';
 
-            displayShiftEl.textContent = (todayRecord.inTime && todayRecord.outTime) ? `${inTime12} - ${outTime12}` : '-- / --';
+            displayShiftEl.textContent = (todayRecord.inTime && todayRecord.outTime) ? `${inTime24} - ${outTime24}` : '-- / --';
             displayDailyHoursEl.textContent = `${dailyDuration.floatHours} Hours`;
 
             // 4. Update Summary Display - Monthly
