@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Employee Time Tracker</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Inter font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
+    <style>
+        /* Apply Inter font family and basic styling */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #eef3f7; /* Light neutral background */
+        }
+        /* Custom scrollbar styling */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 4px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        /* Style for the main container background blending */
+        .app-bg {
+            background: linear-gradient(135deg, #ffffff 50%, #f9fafb 100%);
+        }
+
+        /* --- PRINT STYLES (PDF Report) --- */
+        @media print {
+            /* Ensure the entire app container is focused and unstyled */
+            body { background-color: #fff !important; }
+            body > *:not(#app-container) { display: none !important; }
+            #app-container {
+                width: 100% !important;
+                max-width: none !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                box-shadow: none !important;
+                background: #ffffff !important;
+            }
+            .app-bg { background: #ffffff !important; }
+
+            /* Hide unwanted UI elements (Form, status, main header border, and the button itself) */
+            .border-b-4, #status-message, .bg-blue-50, #generate-report-btn, #time-form, 
+            .lucide-clock-3, .text-4xl, .border-purple-200 {
+                display: none !important;
+            }
+
+            /* Make content visible and remove interactive styling */
+            #content {
+                display: block !important;
+            }
+            section {
+                padding: 1rem !important;
+                box-shadow: none !important;
+                border: none !important;
+            }
+            
+            /* Print Header for the report */
+            #app-container::before {
+                content: "Monthly Work Report";
+                display: block;
+                font-size: 24pt;
+                font-weight: bold;
+                text-align: center;
+                padding-bottom: 20px;
+                margin-bottom: 20px;
+                border-bottom: 2px solid #ccc;
+            }
+
+            /* Focus on Summary and History */
+            #shifts-history {
+                max-height: none !important;
+                overflow-y: visible !important;
+            }
+            #shifts-history table {
+                font-size: 10pt;
+                width: 100%;
+                border-collapse: collapse;
+            }
+            #shifts-history th, #shifts-history td {
+                padding: 8px;
+                border: 1px solid #ccc;
+            }
+            .text-2xl {
+                font-size: 14pt !important;
+            }
+            .text-3xl {
+                font-size: 18pt !important;
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <!-- Main Application Card -->
+    <div id="app-container" class="w-full max-w-4xl app-bg shadow-2xl rounded-2xl p-6 md:p-10 transition-all duration-300 transform hover:shadow-3xl">
+        <h1 class="text-4xl font-extrabold text-teal-700 mb-6 border-b-4 border-teal-200 pb-3">
+            <span class="inline-block align-middle mr-3">
+                <!-- SVG Icon for Clock/Time - Updated Style -->
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-clock-3">
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="M12 6v6l4 2"/>
+                </svg>
+            </span>
+            Monthly Work Tracker
+        </h1>
+
+        <!-- Loading/Error Message -->
+        <div id="status-message" class="text-center p-3 text-sm text-gray-600">
+            Initializing application...
+        </div>
+
+        <!-- Content Section -->
+        <div id="content" class="space-y-8 hidden">
+
+            <!-- 1. Time Entry Section (Now a calming blue) -->
+            <section class="p-6 bg-blue-50 rounded-xl border border-blue-200 shadow-lg">
+                <h2 class="text-2xl font-semibold text-blue-800 mb-5 flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 mr-2 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><path d="M14 2v4"/><path d="M10 2v4"/><path d="M17 9v1"/><path d="M7 9v1"/></svg>
+                    Daily Shift Entry
+                </h2>
+                <!-- Updated form to md:grid-cols-4 for Date/In/Out/Submit -->
+                <form id="time-form" class="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+                    <!-- Date -->
+                    <div class="col-span-2 md:col-span-1">
+                        <label for="record-date" class="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                        <input type="date" id="record-date" required class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3 border transition duration-150">
+                    </div>
+                    <!-- In Time -->
+                    <div class="col-span-1 md:col-span-1">
+                        <label for="in-time" class="block text-sm font-medium text-gray-700 mb-1">In-Time (24hr)</label>
+                        <input type="time" id="in-time" required class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3 border transition duration-150">
+                    </div>
+                    <!-- Out Time -->
+                    <div class="col-span-1 md:col-span-1">
+                        <label for="out-time" class="block text-sm font-medium text-gray-700 mb-1">Out-Time (24hr)</label>
+                        <input type="time" id="out-time" required class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3 border transition duration-150">
+                    </div>
+                    <!-- Submit Button -->
+                    <div class="col-span-2 md:col-span-1 flex items-end">
+                        <button type="submit" class="w-full py-3 px-4 border border-transparent rounded-lg shadow-md text-base font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-offset-2 focus:ring-blue-500 transition duration-300 transform hover:scale-[1.02]">
+                            Save Record
+                        </button>
+                    </div>
+                </form>
+            </section>
+
+            <!-- 2. Result Display Section (Now a pleasant violet) -->
+            <section class="p-6 bg-purple-50 rounded-xl border border-purple-200 shadow-lg">
+                <h2 class="text-2xl font-semibold text-purple-800 mb-5">
+                    Summary for <span id="month-display" class="font-extrabold text-purple-900"></span>
+                </h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <!-- Today's Shift -->
+                    <div class="p-4 bg-white rounded-lg border border-purple-300">
+                        <span class="block text-sm font-medium text-gray-600">Today's Shift:</span>
+                        <span id="display-shift" class="block text-xl font-bold text-blue-700 mt-1">-- / --</span>
+                    </div>
+                    <!-- Daily Hours -->
+                    <div class="p-4 bg-white rounded-lg border border-purple-300">
+                        <span class="block text-sm font-medium text-gray-600">Total Hours Logged Today:</span>
+                        <span id="display-daily-hours" class="block text-xl font-bold text-green-700 mt-1">0.00 Hours</span>
+                    </div>
+                    <!-- Monthly Total -->
+                    <div class="p-4 bg-purple-200 rounded-lg border-2 border-purple-500 shadow-inner">
+                        <span class="block text-sm font-extrabold text-purple-800">Total Monthly Hours:</span>
+                        <span id="display-monthly-hours" class="block text-3xl font-extrabold text-purple-900 mt-1">0.00 Hrs</span>
+                    </div>
+                </div>
+                <!-- Report Button -->
+                <div class="mt-6 pt-4 border-t border-purple-200">
+                    <button id="generate-report-btn" class="w-full py-3 px-4 rounded-lg shadow-md text-base font-medium text-white bg-teal-600 hover:bg-teal-700 focus:outline-none focus:ring-4 focus:ring-offset-2 focus:ring-teal-500 transition duration-300 transform hover:scale-[1.01]">
+                        Generate Monthly PDF Report (Print View)
+                    </button>
+                </div>
+            </section>
+
+            <!-- 3. Monthly Shift History Section (Now teal themed) -->
+            <section class="p-6 bg-teal-50 rounded-xl border border-teal-200 shadow-lg">
+                <h2 class="text-2xl font-semibold text-teal-800 mb-5 flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 mr-2 text-teal-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18.7 8l-4.2 4.5l-2.5-2.5L7 17"/></svg>
+                    Monthly Shifts History
+                </h2>
+                <div id="shifts-history" class="max-h-96 overflow-y-auto">
+                    <!-- Shift records will be dynamically inserted here -->
+                </div>
+            </section>
+
+        </div>
+    </div>
+
+    <!-- Local Storage Logic -->
+    <script type="module">
+        // DOM Elements
+        const statusMessageEl = document.getElementById('status-message');
+        const contentEl = document.getElementById('content');
+        const timeForm = document.getElementById('time-form');
+        const recordDateInput = document.getElementById('record-date');
+        const inTimeInput = document.getElementById('in-time');
+        const outTimeInput = document.getElementById('out-time');
+        const displayShiftEl = document.getElementById('display-shift');
+        const displayDailyHoursEl = document.getElementById('display-daily-hours');
+        const displayMonthlyHoursEl = document.getElementById('display-monthly-hours');
+        const monthDisplayEl = document.getElementById('month-display');
+        const generateReportBtn = document.getElementById('generate-report-btn');
+
+        // Local Storage Keys
+        const LS_RECORDS_KEY = 'employee_time_records';
+
+        // --- Utility Functions ---
+
+        /**
+         * Function to safely set the status message
+         */
+        function setStatus(message, isError = false) {
+            statusMessageEl.textContent = message;
+            statusMessageEl.className = `text-center p-3 text-sm ${isError ? 'text-red-600 bg-red-100 rounded-md' : 'text-gray-600'}`;
+        }
+
+        /**
+         * Loads data from localStorage by key.
+         */
+        function loadFromLS(key, defaultValue = {}) {
+            try {
+                const data = localStorage.getItem(key);
+                return data ? JSON.parse(data) : defaultValue;
+            } catch (e) {
+                console.error("Error loading from localStorage:", key, e);
+                return defaultValue;
+            }
+        }
+
+        /**
+         * Saves data to localStorage by key.
+         */
+        function saveToLS(key, data) {
+            try {
+                localStorage.setItem(key, JSON.stringify(data));
+            } catch (e) {
+                console.error("Error saving to localStorage:", key, e);
+                setStatus("Error: Local storage limit reached!", true);
+            }
+        }
+
+        /**
+         * Converts a 24-hour time string ("HH:MM") to 12-hour format ("h:mm A").
+         * @param {string} time24 - Time string in "HH:MM" format.
+         * @returns {string} Time string in "h:mm AM/PM" format.
+         */
+        function formatTime12Hour(time24) {
+            if (!time24) return '--:--';
+            try {
+                const [hours, minutes] = time24.split(':').map(Number);
+                const ampm = hours >= 12 ? 'PM' : 'AM';
+                const displayHours = hours % 12 || 12; // 0 becomes 12
+                const displayMinutes = String(minutes).padStart(2, '0');
+                return `${displayHours}:${displayMinutes} ${ampm}`;
+            } catch (e) {
+                console.error("Error formatting time:", e);
+                return time24;
+            }
+        }
+
+        /**
+         * Calculates the difference between two time strings ("HH:MM").
+         * Accounts for shifts spanning midnight.
+         */
+        function calculateWorkDuration(startTime, endTime) {
+            if (!startTime || !endTime) return { formatted: "0 minutes", floatHours: "0.00", durationMinutes: 0 };
+
+            try {
+                const [startHour, startMinute] = startTime.split(':').map(Number);
+                const [endHour, endMinute] = endTime.split(':').map(Number);
+
+                let startTotalMinutes = startHour * 60 + startMinute;
+                let endTotalMinutes = endHour * 60 + endMinute;
+
+                // Adjust for shifts that cross midnight (e.g., 22:00 to 06:00)
+                if (endTotalMinutes < startTotalMinutes) {
+                    endTotalMinutes += 24 * 60;
+                }
+
+                const durationMinutes = endTotalMinutes - startTotalMinutes;
+                
+                const hours = Math.floor(durationMinutes / 60);
+                const minutes = durationMinutes % 60;
+
+                const floatHours = (durationMinutes / 60).toFixed(2);
+
+                return {
+                    formatted: `${hours} hrs, ${minutes} mins`,
+                    floatHours: floatHours,
+                    durationMinutes: durationMinutes
+                };
+            } catch (e) {
+                console.error("Error calculating duration:", e);
+                return { formatted: "0 hrs, 0 mins", floatHours: "0.00", durationMinutes: 0 };
+            }
+        }
+        
+        /**
+         * Calculates the total minutes for the current month from records.
+         */
+        function calculateMonthlyTotal(records) {
+            const now = new Date();
+            // We still use today's month/year to determine which month to display the summary for.
+            const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            const monthlyRecords = records[monthKey] || [];
+            
+            let totalMinutes = 0;
+            monthlyRecords.forEach(record => {
+                totalMinutes += record.durationMinutes || 0;
+            });
+
+            return totalMinutes;
+        }
+
+        /**
+         * Renders the list of daily entries for the current month.
+         * @param {object} records - All time records from local storage.
+         */
+        function renderMonthlyShifts(records) {
+            const shiftsHistoryEl = document.getElementById('shifts-history');
+            const now = new Date();
+            const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            const monthlyRecords = records[monthKey] || [];
+
+            // Sort records by date descending (most recent first)
+            monthlyRecords.sort((a, b) => b.date.localeCompare(a.date));
+
+            if (monthlyRecords.length === 0) {
+                shiftsHistoryEl.innerHTML = '<p class="text-center text-gray-500 py-6 bg-teal-100 rounded-lg">No shift entries recorded for this month yet. Use the form above to add an entry!</p>';
+                return;
+            }
+
+            let html = `
+                <div class="overflow-x-auto rounded-lg shadow-xl">
+                    <table class="min-w-full divide-y divide-teal-200">
+                        <thead class="bg-teal-100">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-bold text-teal-800 uppercase tracking-wider">Date</th>
+                                <th class="px-4 py-3 text-left text-xs font-bold text-teal-800 uppercase tracking-wider">In Time</th>
+                                <th class="px-4 py-3 text-left text-xs font-bold text-teal-800 uppercase tracking-wider">Out Time</th>
+                                <th class="px-4 py-3 text-left text-xs font-bold text-teal-800 uppercase tracking-wider">Duration</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-teal-100">
+            `;
+
+            monthlyRecords.forEach(record => {
+                // Format date from YYYY-MM-DD to Month Day (e.g., Nov 05)
+                const dateObj = new Date(record.date.replace(/-/g, '/')); // Use replace for cross-browser safety
+                const dateDisplay = dateObj.toLocaleString('en-US', { month: 'short', day: '2-digit' }); 
+                
+                const duration = calculateWorkDuration(record.inTime, record.outTime);
+                const inTime12 = formatTime12Hour(record.inTime);
+                const outTime12 = formatTime12Hour(record.outTime);
+
+                html += `
+                    <tr class="hover:bg-teal-50 transition duration-150 cursor-pointer">
+                        <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">${dateDisplay}</td>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-blue-700 font-semibold">${inTime12}</td>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-red-700 font-semibold">${outTime12}</td>
+                        <td class="px-4 py-3 whitespace-nowrap text-sm text-teal-600 font-bold">${duration.floatHours} hrs</td>
+                    </tr>
+                `;
+            });
+
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            shiftsHistoryEl.innerHTML = html;
+        }
+
+
+        // --- UI Update Function ---
+
+        function updateUI() {
+            // Get current date keys for default display and initialization
+            const now = new Date();
+            const todayDateKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+            const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+            // Load data from Local Storage
+            const records = loadFromLS(LS_RECORDS_KEY, {});
+
+            const monthlyRecords = records[monthKey] || [];
+            // Find today's record to populate the 'Today's Shift' summary
+            const todayRecord = monthlyRecords.find(r => r.date === todayDateKey) || {};
+
+            // 1. Update Form Inputs: Set the date picker to today's date initially.
+            // If the user submits, the date picker value is used.
+            if (!recordDateInput.value) {
+                recordDateInput.value = todayDateKey;
+            }
+            // Populate time inputs with today's record if one exists
+            inTimeInput.value = todayRecord.inTime || '';
+            outTimeInput.value = todayRecord.outTime || '';
+
+
+            // 2. Update Summary Display - Month
+            monthDisplayEl.textContent = now.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+
+            // 3. Update Summary Display - Daily (using 12-hour format)
+            const dailyDuration = calculateWorkDuration(todayRecord.inTime, todayRecord.outTime);
+            
+            const inTime12 = formatTime12Hour(todayRecord.inTime);
+            const outTime12 = formatTime12Hour(todayRecord.outTime);
+
+            displayShiftEl.textContent = (todayRecord.inTime && todayRecord.outTime) ? `${inTime12} - ${outTime12}` : '-- / --';
+            displayDailyHoursEl.textContent = `${dailyDuration.floatHours} Hours`;
+
+            // 4. Update Summary Display - Monthly
+            const monthlyTotalMinutes = calculateMonthlyTotal(records);
+            const monthlyTotalHours = (monthlyTotalMinutes / 60).toFixed(2);
+            displayMonthlyHoursEl.textContent = `${monthlyTotalHours} Hrs`;
+            
+            // 5. Render Monthly Shift History
+            renderMonthlyShifts(records);
+
+            // Final status update
+            setStatus("Ready. Data is stored locally in your browser.");
+            contentEl.classList.remove('hidden');
+        }
+
+        // --- Event Handlers ---
+
+        timeForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+
+            const inputDateString = recordDateInput.value;
+            const inTime = inTimeInput.value;
+            const outTime = outTimeInput.value;
+
+            if (!inputDateString || !inTime || !outTime) {
+                setStatus("Date, In-Time, and Out-Time are all required.", true);
+                return;
+            }
+            
+            // Determine the keys based on the input date
+            const dateKey = inputDateString; // YYYY-MM-DD
+            const [year, month] = dateKey.split('-');
+            const monthKey = `${year}-${month}`; // YYYY-MM
+
+            const dailyDuration = calculateWorkDuration(inTime, outTime);
+            
+            if (dailyDuration.durationMinutes < 0) {
+                 setStatus("Out-Time must be after In-Time. (It can cross midnight, e.g., 23:00 to 07:00).", true);
+                 return;
+            }
+            
+            // Create new record for the selected date
+            const newRecord = {
+                date: dateKey,
+                inTime: inTime,
+                outTime: outTime,
+                durationMinutes: dailyDuration.durationMinutes
+            };
+
+            // Load all records structure: { 'YYYY-MM': [{...}, {...}] }
+            const allRecords = loadFromLS(LS_RECORDS_KEY, {});
+            
+            // Get or initialize monthly records array
+            const monthlyRecords = allRecords[monthKey] || [];
+            
+            // Find index of existing record for the selected date
+            const existingIndex = monthlyRecords.findIndex(r => r.date === dateKey);
+
+            if (existingIndex > -1) {
+                // Update existing record
+                monthlyRecords[existingIndex] = newRecord;
+            } else {
+                // Add new record
+                monthlyRecords.push(newRecord);
+            }
+            
+            // Update the main records object
+            allRecords[monthKey] = monthlyRecords;
+
+            // Save back to local storage
+            saveToLS(LS_RECORDS_KEY, allRecords);
+            
+            // Update UI (The UI focuses on the current month, even if a past record was just saved)
+            updateUI();
+            setStatus(`Daily record for ${dateKey} saved/updated!`, false);
+        });
+
+        // Event listener for the new report button
+        generateReportBtn.addEventListener('click', () => {
+            // This triggers the browser's native print dialog
+            window.print();
+        });
+
+        // Start the application
+        window.onload = updateUI;
+    </script>
+</body>
+</html>
