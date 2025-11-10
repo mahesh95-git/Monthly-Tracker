@@ -255,16 +255,44 @@
             }
         }
 
-        function calculateMonthlyTotal(records) {
+        function getCustomMonthRange() {
             const now = new Date();
-            const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-            const monthlyRecords = records[monthKey] || [];
+            const year = now.getFullYear();
+            const month = now.getMonth(); // 0-11
+            const day = now.getDate();
+
+            // If current date is 1-20, show previous month's 20th to current date
+            // If current date is 21-31, show current month's 20th to next month's 20th
+            let startDate, endDate;
             
+            if (day <= 20) {
+                // Show from previous month's 20th
+                startDate = new Date(year, month - 1, 20);
+                endDate = new Date(year, month, 20);
+            } else {
+                // Show from current month's 20th
+                startDate = new Date(year, month, 20);
+                endDate = new Date(year, month + 1, 20);
+            }
+
+            return {
+                start: startDate,
+                end: endDate,
+                displayMonth: day <= 20 ? startDate : endDate
+            };
+        }
+
+        function calculateMonthlyTotal(records) {
+            const dateRange = getCustomMonthRange();
             let totalMinutes = 0;
-            monthlyRecords.forEach(record => {
-                // Recalculate from times to avoid stale values
-                const dur = calculateWorkDuration(record.inTime, record.outTime);
-                totalMinutes += dur.durationMinutes || 0;
+
+            // Convert all records to array and filter by date range
+            Object.values(records).flat().forEach(record => {
+                const recordDate = new Date(record.date);
+                if (recordDate >= dateRange.start && recordDate <= dateRange.end) {
+                    const dur = calculateWorkDuration(record.inTime, record.outTime);
+                    totalMinutes += dur.durationMinutes || 0;
+                }
             });
 
             return totalMinutes;
@@ -272,17 +300,23 @@
 
         function renderMonthlyShifts(records) {
             const shiftsHistoryEl = document.getElementById('shifts-history');
-            const now = new Date();
-            const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-            const monthlyRecords = records[monthKey] || [];
+            const dateRange = getCustomMonthRange();
 
-            monthlyRecords.sort((a, b) => b.date.localeCompare(a.date));
+            // Gather all records within date range
+            const filteredRecords = Object.values(records)
+                .flat()
+                .filter(record => {
+                    const recordDate = new Date(record.date);
+                    return recordDate >= dateRange.start && recordDate <= dateRange.end;
+                })
+                .sort((a, b) => new Date(b.date) - new Date(a.date));
 
-            if (monthlyRecords.length === 0) {
-                shiftsHistoryEl.innerHTML = '<p style="padding:18px; text-align:center; color:#0f766e; background:#ecfeff; border-radius:8px;">No shift entries recorded for this month yet. Use the form above to add an entry!</p>';
+            if (filteredRecords.length === 0) {
+                shiftsHistoryEl.innerHTML = '<p style="padding:18px; text-align:center; color:#0f766e; background:#ecfeff; border-radius:8px;">No shift entries recorded for this period yet. Use the form above to add an entry!</p>';
                 return;
             }
 
+            // Rest of your existing table generation code
             let html = `
                 <div style="overflow-x:auto; border-radius:10px;">
                     <table>
@@ -297,10 +331,9 @@
                         <tbody>
             `;
 
-            monthlyRecords.forEach(record => {
+            filteredRecords.forEach(record => {
                 const dateObj = new Date(record.date.replace(/-/g, '/'));
                 const dateDisplay = dateObj.toLocaleString('en-US', { month: 'short', day: '2-digit' });
-                
                 const duration = calculateWorkDuration(record.inTime, record.outTime);
                 
                 html += `
@@ -334,7 +367,8 @@
             inTimeInput.value = todayRecord.inTime || '';
             outTimeInput.value = todayRecord.outTime || '';
 
-            monthDisplayEl.textContent = now.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+            const dateRange = getCustomMonthRange();
+            monthDisplayEl.textContent = `${dateRange.start.toLocaleString('en-US', { month: 'long' })} 20 - ${dateRange.end.toLocaleString('en-US', { month: 'long' })} 20, ${dateRange.end.getFullYear()}`;
 
             const dailyDuration = calculateWorkDuration(todayRecord.inTime, todayRecord.outTime);
             displayShiftEl.textContent = (todayRecord.inTime && todayRecord.outTime) ? `${todayRecord.inTime} - ${todayRecord.outTime}` : '-- / --';
