@@ -221,9 +221,8 @@
 
         function calculateWorkDuration(startTime, endTime) {
             if (!startTime || !endTime) return { 
-                formatted: "0 minutes", 
+                formatted: "0:00",
                 floatHours: "0.00",
-                timeFormat: "0:00",  // Added timeFormat
                 durationMinutes: 0 
             };
 
@@ -239,30 +238,20 @@
                 }
 
                 const durationMinutes = endTotalMinutes - startTotalMinutes;
-                
                 const hours = Math.floor(durationMinutes / 60);
                 const minutes = durationMinutes % 60;
 
                 // Format as "HH:MM"
-                const timeFormat = `${hours}:${String(minutes).padStart(2, '0')}`;
+                const formatted = `${hours}:${String(minutes).padStart(2, '0')}`;
                 
-                // Format as decimal hours (12.50)
-                const floatHours = (durationMinutes / 60).toFixed(2);
-
                 return {
-                    formatted: `${hours} hrs, ${minutes} mins`,
-                    floatHours: floatHours,
-                    timeFormat: timeFormat,
+                    formatted: formatted,
+                    floatHours: (durationMinutes / 60).toFixed(2),
                     durationMinutes: durationMinutes
                 };
             } catch (e) {
                 console.error("Error calculating duration:", e);
-                return { 
-                    formatted: "0 hrs, 0 mins", 
-                    floatHours: "0.00", 
-                    timeFormat: "0:00",
-                    durationMinutes: 0 
-                };
+                return { formatted: "0:00", floatHours: "0.00", durationMinutes: 0 };
             }
         }
 
@@ -313,16 +302,13 @@
                 const dateDisplay = dateObj.toLocaleString('en-US', { month: 'short', day: '2-digit' });
                 
                 const duration = calculateWorkDuration(record.inTime, record.outTime);
-                const displayDecimal = (duration.durationMinutes / 60).toFixed(2);
-                const inTime24 = record.inTime || '--:--';
-                const outTime24 = record.outTime || '--:--';
-
+                
                 html += `
                     <tr>
                         <td>${dateDisplay}</td>
-                        <td class="time-in">${inTime24}</td>
-                        <td class="time-out">${outTime24}</td>
-                        <td class="duration">${duration.timeFormat} hrs</td>
+                        <td class="time-in">${record.inTime || '--:--'}</td>
+                        <td class="time-out">${record.outTime || '--:--'}</td>
+                        <td class="duration">${duration.formatted} hrs</td>
                     </tr>
                 `;
             });
@@ -351,15 +337,14 @@
             monthDisplayEl.textContent = now.toLocaleString('en-US', { month: 'long', year: 'numeric' });
 
             const dailyDuration = calculateWorkDuration(todayRecord.inTime, todayRecord.outTime);
-            const inTime24 = todayRecord.inTime || '--:--';
-            const outTime24 = todayRecord.outTime || '--:--';
-
-            displayShiftEl.textContent = (todayRecord.inTime && todayRecord.outTime) ? `${inTime24} - ${outTime24}` : '-- / --';
-            displayDailyHoursEl.textContent = `${(dailyDuration.durationMinutes / 60).toFixed(2)} Hours`;
+            displayShiftEl.textContent = (todayRecord.inTime && todayRecord.outTime) ? `${todayRecord.inTime} - ${todayRecord.outTime}` : '-- / --';
+            displayDailyHoursEl.textContent = `${dailyDuration.formatted} Hours`;
 
             const monthlyTotalMinutes = calculateMonthlyTotal(records);
-            const monthlyTotalHours = (monthlyTotalMinutes / 60).toFixed(2);
-            displayMonthlyHoursEl.textContent = `${monthlyTotalHours} Hrs`;
+            const monthlyHours = Math.floor(monthlyTotalMinutes / 60);
+            const monthlyMinutes = monthlyTotalMinutes % 60;
+            const monthlyFormatted = `${monthlyHours}:${String(monthlyMinutes).padStart(2, '0')}`;
+            displayMonthlyHoursEl.textContent = `${monthlyFormatted} Hrs`;
 
             renderMonthlyShifts(records);
 
